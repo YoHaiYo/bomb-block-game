@@ -1,0 +1,38 @@
+.cell {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  font-weight: bold;
+  font-size: 1rem;
+  transition: background-color 0.2s;
+}
+.bomb {
+  background-color: red;
+  color: white;
+}
+.obstacle {
+  color: white;
+}
+.explode {
+  background-color: yellow !important;
+  animation: flash 0.4s ease-in-out;
+}
+@keyframes flash {
+  0% {
+    background-color: yellow;
+  }
+  50% {
+    background-color: orange;
+  }
+  100% {
+    background-color: yellow;
+  }
+}
+.dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 10;
+}
+.overlay-text {
+  z-index: 20;
+}
