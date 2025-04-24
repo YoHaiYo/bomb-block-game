@@ -103,12 +103,12 @@
       }
 
       function updateObstacleStyle(cell) {
-        cell.el.removeClass((_, className) =>
-          (className.match(/bg-gray-[0-9]{3}/g) || []).join(" ")
+        // Tailwind 클래스 정리
+        cell.el.removeClass((_, c) =>
+          (c.match(/bg-gray-[0-9]{3}/g) || []).join(" ")
         );
         if (!cell.obstacle) return;
-        const durability = cell.obstacle;
-        const level = 200 + Math.min(durability - 1, 7) * 100;
+        const level = 400 + Math.min(cell.obstacle - 1, 5) * 100;
         cell.el.addClass(`obstacle bg-gray-${level}`);
       }
 
@@ -144,6 +144,7 @@
       }
 
       function updateTurn() {
+        console.time("updateTurn");
         turn++;
         const toExplode = [];
 
@@ -165,23 +166,35 @@
           explodeBomb(bomb, toExplode);
         }
 
-        for (let i = bombQueue.length - 1; i >= 0; i--) {
-          if (bombQueue[i].countdown <= 0) bombQueue.splice(i, 1);
-        }
+        bombQueue.splice(
+          0,
+          bombQueue.length,
+          ...bombQueue.filter((b) => b.countdown > 0)
+        );
 
         const newWallCount = Math.floor(turn / 3) + 1;
+        console.time("placeRandomObstacles");
         placeRandomObstacles(newWallCount);
+        console.timeEnd("placeRandomObstacles");
+
         updateStatus();
         checkGameOver();
+        console.timeEnd("updateTurn");
       }
 
       function explodeBomb(bomb, toExplodeQueue) {
         const { x, y, power, damage } = bomb;
-        showExplosion(x, y, damage);
         const cell = grid[y][x];
-        cell.el.text("").removeClass("bomb");
+
+        // 🧨 폭탄 제거 처리: 순서 중요!
+        cell.el.text("");
+        cell.el.removeClass("bomb");
         cell.bomb = null;
 
+        // 💥 폭발 임팩트 표시
+        showExplosion(x, y, damage);
+
+        // ➕ 십자 방향으로 처리 (범위는 고정)
         const dirs = [
           [1, 0],
           [-1, 0],
@@ -193,10 +206,13 @@
             const nx = x + dx * i;
             const ny = y + dy * i;
             if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) break;
+
             const target = grid[ny][nx];
 
+            // 💥 임팩트 표시
             showExplosion(nx, ny, damage);
 
+            // 🧱 벽 처리
             if (target.obstacle) {
               score += 1;
               target.obstacle--;
@@ -208,12 +224,16 @@
                 target.el.text(target.obstacle);
               }
               updateObstacleStyle(target);
-              break;
+              break; // 벽이 있으면 더 진행 안 함
             }
 
+            // 🔁 연쇄 폭발: 데미지만 누적, 파워는 고정
             if (target.bomb && target.bomb.countdown > 0) {
               target.bomb.countdown = 0;
-              toExplodeQueue.push({ ...target.bomb, damage: damage + 1 });
+              toExplodeQueue.push({
+                ...target.bomb,
+                damage: damage + 1, // 누적 데미지만 증가
+              });
             }
           }
         });
@@ -221,11 +241,13 @@
 
       function showExplosion(x, y, damage = 1) {
         const cell = grid[y][x];
-        cell.el.addClass("explode").text(damage);
-        setTimeout(() => {
+        cell.el.text(damage);
+        cell.el.addClass("explode");
+
+        cell.el.one("animationend", () => {
           if (!cell.bomb && !cell.obstacle) cell.el.text("");
           cell.el.removeClass("explode");
-        }, 300);
+        });
       }
 
       function checkGameOver() {
