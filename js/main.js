@@ -109,24 +109,13 @@ function showUpgradeOptions() {
 function updateTurn() {
   turn++;
 
-  // 업그레이드 타이밍
-  if (turn % 10 === 0) {
-    showUpgradeOptions();
-  }
-
-  if (upgrading) {
-    // 업그레이드 선택 중에는 나머지 로직 진행 막기
-    updateStatus();
-    return;
-  }
-
-  // 폭탄 카운트다운 감소 및 업데이트
+  // 폭탄 카운트다운 감소 및 화면 업데이트
   bombQueue.forEach((bomb) => {
     bomb.countdown--;
     grid[bomb.y][bomb.x].el.text(bomb.countdown);
   });
 
-  // 이후 기존 updateTurn 로직 그대로
+  // 터질 폭탄 모으기
   const toExplode = bombQueue.filter((b) => b.countdown <= 0);
   const group = new Set();
   const queue = [...toExplode];
@@ -146,7 +135,7 @@ function updateTurn() {
     ];
     dirs.forEach(([dx, dy]) => {
       for (let i = 1; i <= b.power; i++) {
-        // bomb의 power만큼
+        // power 만큼 확인
         const nx = b.x + dx * i;
         const ny = b.y + dy * i;
         if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) break;
@@ -157,37 +146,45 @@ function updateTurn() {
           queue.push(neighbor);
         }
 
-        // 벽이 있으면 폭발 전파 멈춤 (현실감 주려면 이걸 추가할 수도 있음)
         if (grid[ny][nx].obstacle) {
-          break;
+          break; // 벽이 있으면 연쇄폭발 멈춤
         }
       }
     });
   }
 
+  // 그룹 내 폭탄 실제 폭발
   const totalDamage = group.size;
 
   group.forEach((key) => {
     const [x, y] = key.split(",").map(Number);
     const bomb = grid[y][x].bomb;
-    explodeUniformDamage(x, y, totalDamage, bomb?.power || bombPower); // <= power 전달
+    explodeUniformDamage(x, y, totalDamage, bomb?.power || bombPower);
     grid[y][x].bomb = null;
     grid[y][x].el.text("").removeClass("bomb");
   });
 
+  // 폭탄 큐 정리
   bombQueue.splice(
     0,
     bombQueue.length,
     ...bombQueue.filter((b) => b.countdown > 0)
   );
 
+  // 3턴마다 벽 생성
   if (turn % 3 === 0) {
     const newWallCount = Math.floor(turn / 3);
     placeRandomObstacles(newWallCount);
   }
 
+  // 상태 업데이트
   updateStatus();
   checkGameOver();
+
+  // 10턴마다 업그레이드 카드 표시 (가장 마지막에)
+  if (turn % 10 === 0) {
+    showUpgradeOptions();
+  }
 }
 
 function explodeUniformDamage(x, y, damage, power = 1) {
