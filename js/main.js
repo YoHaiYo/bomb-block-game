@@ -121,9 +121,10 @@ function showUpgradeOptions() {
     `);
 
     $card.on("click", () => {
-      option.action();
+      option.action(); // bombPower 또는 bombDamage 올리기
+      updateStatus(); // 👉 상태 갱신 즉시 해줘야 함
       $("#upgrade-cards").addClass("hidden").empty();
-      $("#grid-dim").addClass("hidden"); // 👉 딤 비활성화
+      $("#grid-dim").addClass("hidden");
       upgrading = false;
     });
 
