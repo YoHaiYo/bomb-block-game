@@ -4,6 +4,9 @@ const bombQueue = [];
 let turn = 0;
 let score = 0;
 let gameOver = false;
+let bombPower = 1; // 기본 폭파 범위
+let bombDamage = 1; // 기본 폭파 데미지
+let upgrading = false; // 업그레이드 선택 중 여부
 
 function updateStatus() {
   $("#status").text(`Turn: ${turn} / Point: ${score}`);
@@ -55,25 +58,76 @@ function placeRandomObstacles(count = 1) {
 function placeBomb(x, y) {
   const cell = grid[y][x];
   if (!cell.bomb && !cell.obstacle) {
-    const bomb = { x, y, countdown: 3, power: 1, damage: 1 };
+    const bomb = { x, y, countdown: 3, power: bombPower, damage: bombDamage };
     cell.bomb = bomb;
     bombQueue.push(bomb);
     cell.el.text("3").addClass("bomb");
   }
 }
 
+function showUpgradeOptions() {
+  upgrading = true;
+  const $upgradeArea = $("#upgrade-cards").empty().removeClass("hidden");
+  $("#grid-dim").removeClass("hidden"); // 👉 딤 활성화
+
+  const options = [
+    {
+      name: "폭파 범위 +1",
+      icon: "🧨",
+      action: () => {
+        bombPower += 1;
+      },
+    },
+    {
+      name: "폭파 데미지 +1",
+      icon: "💥",
+      action: () => {
+        bombDamage += 1;
+      },
+    },
+  ];
+
+  options.forEach((option) => {
+    const $card = $(`
+      <div class="bg-white shadow-lg rounded-lg p-6 m-2 cursor-pointer hover:bg-gray-200 flex flex-col items-center w-32">
+        <div class="text-4xl mb-2">${option.icon}</div>
+        <div class="font-bold text-sm">${option.name}</div>
+      </div>
+    `);
+
+    $card.on("click", () => {
+      option.action();
+      $("#upgrade-cards").addClass("hidden").empty();
+      $("#grid-dim").addClass("hidden"); // 👉 딤 비활성화
+      upgrading = false;
+    });
+
+    $upgradeArea.append($card);
+  });
+}
+
 function updateTurn() {
   turn++;
-  // 0. 폭탄 카운트다운 감소 및 화면 업데이트
+
+  // 업그레이드 타이밍
+  if (turn % 10 === 0) {
+    showUpgradeOptions();
+  }
+
+  if (upgrading) {
+    // 업그레이드 선택 중에는 나머지 로직 진행 막기
+    updateStatus();
+    return;
+  }
+
+  // 폭탄 카운트다운 감소 및 업데이트
   bombQueue.forEach((bomb) => {
     bomb.countdown--;
-    grid[bomb.y][bomb.x].el.text(bomb.countdown); // 👈 추가된 부분
+    grid[bomb.y][bomb.x].el.text(bomb.countdown);
   });
 
-  // 1. 터질 폭탄들 모으기
+  // 이후 기존 updateTurn 로직 그대로
   const toExplode = bombQueue.filter((b) => b.countdown <= 0);
-
-  // 2. 연쇄 그룹 만들기
   const group = new Set();
   const queue = [...toExplode];
 
@@ -91,37 +145,42 @@ function updateTurn() {
       [0, -1],
     ];
     dirs.forEach(([dx, dy]) => {
-      const nx = b.x + dx;
-      const ny = b.y + dy;
-      if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) return;
+      for (let i = 1; i <= b.power; i++) {
+        // bomb의 power만큼
+        const nx = b.x + dx * i;
+        const ny = b.y + dy * i;
+        if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) break;
 
-      const neighbor = grid[ny][nx].bomb;
-      if (neighbor && neighbor.countdown > 0) {
-        neighbor.countdown = 0;
-        queue.push(neighbor);
+        const neighbor = grid[ny][nx].bomb;
+        if (neighbor && neighbor.countdown > 0) {
+          neighbor.countdown = 0;
+          queue.push(neighbor);
+        }
+
+        // 벽이 있으면 폭발 전파 멈춤 (현실감 주려면 이걸 추가할 수도 있음)
+        if (grid[ny][nx].obstacle) {
+          break;
+        }
       }
     });
   }
 
-  // 3. 데미지 = 연쇄 폭탄 개수
   const totalDamage = group.size;
 
-  // 4. 그룹 내 폭탄들 실제 폭발
   group.forEach((key) => {
     const [x, y] = key.split(",").map(Number);
-    explodeUniformDamage(x, y, totalDamage);
+    const bomb = grid[y][x].bomb;
+    explodeUniformDamage(x, y, totalDamage, bomb?.power || bombPower); // <= power 전달
     grid[y][x].bomb = null;
     grid[y][x].el.text("").removeClass("bomb");
   });
 
-  // 5. bombQueue 정리
   bombQueue.splice(
     0,
     bombQueue.length,
     ...bombQueue.filter((b) => b.countdown > 0)
   );
 
-  // 6. 벽 생성 (3턴마다)
   if (turn % 3 === 0) {
     const newWallCount = Math.floor(turn / 3);
     placeRandomObstacles(newWallCount);
@@ -131,7 +190,7 @@ function updateTurn() {
   checkGameOver();
 }
 
-function explodeUniformDamage(x, y, damage) {
+function explodeUniformDamage(x, y, damage, power = 1) {
   showExplosion(x, y, damage);
 
   const dirs = [
@@ -141,7 +200,8 @@ function explodeUniformDamage(x, y, damage) {
     [0, -1],
   ];
   dirs.forEach(([dx, dy]) => {
-    for (let i = 1; i <= 1; i++) {
+    for (let i = 1; i <= power; i++) {
+      // power 만큼 반복
       const nx = x + dx * i;
       const ny = y + dy * i;
       if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) break;
@@ -247,7 +307,7 @@ function checkGameOver() {
 }
 
 $("#grid").on("click", ".cell", function () {
-  if (gameOver) return;
+  if (gameOver || upgrading) return; // 👉 업그레이드 중이면 클릭 무시
 
   const x = parseInt($(this).data("x"));
   const y = parseInt($(this).data("y"));
