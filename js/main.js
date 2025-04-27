@@ -7,6 +7,7 @@ let gameOver = false;
 let bombPower = 1; // 기본 폭파 범위
 let bombDamage = 1; // 기본 폭파 데미지
 let upgrading = false; // 업그레이드 선택 중 여부
+const upgradeTurnNum = 10;
 
 function updateStatus() {
   $("#status").text(`Turn: ${turn} / Point: ${score}`);
@@ -181,8 +182,8 @@ function updateTurn() {
   updateStatus();
   checkGameOver();
 
-  // 10턴마다 업그레이드 카드 표시 (가장 마지막에)
-  if (turn % 10 === 0) {
+  // n턴마다 업그레이드 카드 표시 (가장 마지막에)
+  if (turn % upgradeTurnNum === 0) {
     showUpgradeOptions();
   }
 }
