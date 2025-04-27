@@ -97,14 +97,14 @@ function showUpgradeOptions() {
 
   const options = [
     {
-      name: "폭파 범위 +1",
+      name: "Bomb Range +1",
       icon: "🧨",
       action: () => {
         bombPower += 1;
       },
     },
     {
-      name: "폭파 데미지 +1",
+      name: "Bomb Damage +1",
       icon: "💥",
       action: () => {
         bombDamage += 1;
