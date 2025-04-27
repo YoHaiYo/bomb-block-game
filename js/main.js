@@ -8,6 +8,18 @@ let bombPower = 1; // 기본 폭파 범위
 let bombDamage = 1; // 기본 폭파 데미지
 let upgrading = false; // 업그레이드 선택 중 여부
 const upgradeTurnNum = 10; // 업그레이드 턴 주기
+let bestScore = 0;
+
+function loadBestScore() {
+  const saved = localStorage.getItem("bombBlockBestScore");
+  bestScore = saved ? parseInt(saved) : 0;
+}
+function saveBestScore() {
+  if (score > bestScore) {
+    bestScore = score;
+    localStorage.setItem("bombBlockBestScore", bestScore);
+  }
+}
 
 function updateStatus() {
   $("#status").html(`
@@ -19,8 +31,13 @@ function updateStatus() {
       </div>
 
       <div class="flex items-center gap-1">
-        <span class="text-gray-600">Point</span>
+        <span class="text-gray-600">Score</span>
         <span class="font-bold text-red-500">${score}</span>
+      </div>
+
+      <div class="flex items-center gap-1">
+        <span class="text-gray-600">Best Score</span>
+        <span class="font-bold text-red-500">${bestScore}</span>
       </div>
 
       <div class="flex items-center gap-1">
@@ -32,7 +49,6 @@ function updateStatus() {
         <span class="text-gray-600">Damage</span>
         <span class="font-bold text-yellow-500">${bombDamage}</span>
       </div>
-
     </div>
   `);
 }
@@ -340,9 +356,12 @@ $("#grid").on("click", ".cell", function () {
   if (cell.bomb || cell.obstacle) return;
 
   placeBomb(x, y);
+  saveBestScore(); // 👉 클릭하자마자 최고 점수 업데이트
+  updateStatus(); // 👉 상태창 바로 갱신
   updateTurn();
 });
 
 createGrid();
 placeRandomObstacles(10);
-updateStatus();
+loadBestScore(); // 먼저 불러오고
+updateStatus(); // 그리고 화면 반영
