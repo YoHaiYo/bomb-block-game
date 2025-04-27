@@ -16,9 +16,40 @@
   >
     <div class="w-full max-w-md sm:max-w-xl text-center mb-4">
       <h1 class="text-2xl text-yellow-400 font-bold">Bomb Block Game</h1>
-      <p id="status" class="mt-2 text-sm text-gray-700">
-        <!-- js로 들어옴 -->
-      </p>
+      <div id="status" class="mt-2 text-sm text-gray-700">
+        <div
+          class="bg-white rounded-md px-4 py-2 shadow-inner text-sm md:text-lg font-mono flex flex-col gap-2"
+        >
+          <!-- 첫 번째 줄 -->
+          <div class="flex flex-wrap justify-center gap-x-6 gap-y-2 w-full">
+            <div class="flex items-center gap-1">
+              <span class="text-gray-600">Turn</span>
+              <span id="status-turn" class="font-bold text-red-400"></span>
+            </div>
+
+            <div class="flex items-center gap-1">
+              <span class="text-gray-600">Score</span>
+              <span id="status-score" class="font-bold text-red-400"></span>
+            </div>
+
+            <div class="flex items-center gap-1">
+              <span class="text-gray-600">Best Score</span>
+              <span id="status-best" class="font-bold text-red-600"></span>
+            </div>
+          </div>
+          <!-- 두 번째 줄 (Range + Damage는 무조건 하단 고정) -->
+          <div class="flex justify-center gap-x-6 w-full">
+            <div class="flex items-center gap-1">
+              <span class="text-gray-600">Range</span>
+              <span id="status-range" class="font-bold text-yellow-500"></span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="text-gray-600">Damage</span>
+              <span id="status-damage" class="font-bold text-yellow-500"></span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="relative w-full max-w-md sm:max-w-xl">

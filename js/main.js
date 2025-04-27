@@ -7,7 +7,7 @@ let gameOver = false;
 let bombPower = 1; // 기본 폭파 범위
 let bombDamage = 1; // 기본 폭파 데미지
 let upgrading = false; // 업그레이드 선택 중 여부
-const upgradeTurnNum = 10; // 업그레이드 턴 주기
+const upgradeTurnNum = 25; // 업그레이드 턴 주기
 let bestScore = 0;
 
 function loadBestScore() {
@@ -22,35 +22,12 @@ function saveBestScore() {
 }
 
 function updateStatus() {
-  $("#status").html(`
-    <div class="bg-white rounded-md px-4 py-2 shadow-inner text-sm md:text-lg  font-mono flex flex-wrap justify-center gap-x-6 gap-y-2">
-
-      <div class="flex items-center gap-1">
-        <span class="text-gray-600">Turn</span>
-        <span class="font-bold text-red-500">${turn}</span>
-      </div>
-
-      <div class="flex items-center gap-1">
-        <span class="text-gray-600">Score</span>
-        <span class="font-bold text-red-500">${score}</span>
-      </div>
-
-      <div class="flex items-center gap-1">
-        <span class="text-gray-600">Best Score</span>
-        <span class="font-bold text-red-500">${bestScore}</span>
-      </div>
-
-      <div class="flex items-center gap-1">
-        <span class="text-gray-600">Range</span>
-        <span class="font-bold text-yellow-500">${bombPower}</span>
-      </div>
-
-      <div class="flex items-center gap-1">
-        <span class="text-gray-600">Damage</span>
-        <span class="font-bold text-yellow-500">${bombDamage}</span>
-      </div>
-    </div>
-  `);
+  saveBestScore();
+  $("#status-turn").text(turn);
+  $("#status-score").text(score);
+  $("#status-best").text(bestScore);
+  $("#status-range").text(bombPower);
+  $("#status-damage").text(bombDamage);
 }
 
 function createGrid() {
