@@ -11,7 +11,7 @@ const upgradeTurnNum = 10; // 업그레이드 턴 주기
 
 function updateStatus() {
   $("#status").html(`
-    <div class="bg-white rounded-md px-4 py-2 shadow-inner text-lg font-mono flex flex-wrap justify-center gap-x-6 gap-y-2">
+    <div class="bg-white rounded-md px-4 py-2 shadow-inner text-sm md:text-lg  font-mono flex flex-wrap justify-center gap-x-6 gap-y-2">
 
       <div class="flex items-center gap-1">
         <span class="text-gray-600">Turn</span>
@@ -184,7 +184,11 @@ function updateTurn() {
   group.forEach((key) => {
     const [x, y] = key.split(",").map(Number);
     const bomb = grid[y][x].bomb;
-    explodeUniformDamage(x, y, totalDamage, bomb?.power || bombPower);
+    if (bomb) {
+      explodeUniformDamage(x, y, bomb.damage, bomb.power);
+    } else {
+      explodeUniformDamage(x, y, bombDamage, bombPower);
+    }
     grid[y][x].bomb = null;
     grid[y][x].el.text("").removeClass("bomb");
   });
@@ -278,10 +282,9 @@ function explodeBomb(bomb, toExplodeQueue) {
       // 💥 데미지 표시
       showExplosion(nx, ny, damage);
 
-      // 🧱 벽 처리에 실제 누적 데미지 반영
+      // 🧱 벽 처리
       if (target.obstacle) {
         target.obstacle -= damage;
-
         if (target.obstacle <= 0) {
           score += 2;
           target.obstacle = null;
@@ -290,17 +293,16 @@ function explodeBomb(bomb, toExplodeQueue) {
           score += 1;
           target.el.text(target.obstacle);
         }
-
         updateObstacleStyle(target);
         break;
       }
 
-      // 🔁 연쇄 폭발: 데미지 누적, power는 고정
+      // 🔁 연쇄 폭발: damage 누적 전파
       if (target.bomb && target.bomb.countdown > 0) {
         target.bomb.countdown = 0;
         toExplodeQueue.push({
           ...target.bomb,
-          damage: damage + (target.damage || 1), // 데미지 누적 전파
+          damage: damage + target.bomb.damage, // 누적 damage
         });
       }
     }
