@@ -103,6 +103,10 @@
         >
           <h1 class="text-white text-2xl font-bold">Select Upgrade!</h1>
         </div>
+        <canvas
+          id="effect-canvas"
+          class="absolute top-0 left-0 w-full h-full pointer-events-none z-50"
+        ></canvas>
       </div>
 
       <div
@@ -137,6 +141,67 @@
       let upgrading = false; // 업그레이드 선택 중 여부
       const upgradeTurnNum = 25; // 업그레이드 턴 주기
       let bestScore = 0;
+      const canvas = document.getElementById("effect-canvas");
+      const ctx = canvas.getContext("2d");
+      let particles = [];
+
+      function resizeCanvas() {
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+      }
+
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas(); // 초기에 한 번 설정
+
+      function updateParticles() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        particles.forEach((p) => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.alpha -= 0.02;
+        });
+
+        particles = particles.filter((p) => p.alpha > 0);
+
+        particles.forEach((p) => {
+          ctx.globalAlpha = p.alpha;
+          ctx.fillStyle = "orange";
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        ctx.globalAlpha = 1;
+
+        requestAnimationFrame(updateParticles);
+      }
+
+      updateParticles(); // 루프 시작
+
+      // 이펙트 발생 함수
+      function getCellCenterCoords(cellEl) {
+        const rect = cellEl.get(0).getBoundingClientRect();
+        const parent = $("#grid").get(0).getBoundingClientRect();
+
+        return {
+          x: rect.left + rect.width / 2 - parent.left,
+          y: rect.top + rect.height / 2 - parent.top,
+        };
+      }
+
+      function spawnExplosion(x, y) {
+        for (let i = 0; i < 20; i++) {
+          particles.push({
+            x,
+            y,
+            vx: (Math.random() - 0.5) * 4,
+            vy: (Math.random() - 0.5) * 4,
+            alpha: 1,
+            radius: 2 + Math.random() * 2,
+          });
+        }
+      }
 
       function loadBestScore() {
         const saved = localStorage.getItem("bombBlockBestScore");
@@ -444,6 +509,10 @@
         cell.el.text(damage);
         cell.el.addClass("explode");
 
+        // 💥 캔버스 폭발 이펙트 추가
+        const coords = getCellCenterCoords(cell.el);
+        spawnExplosion(coords.x, coords.y);
+
         cell.el.one("animationend", () => {
           if (!cell.bomb && !cell.obstacle) {
             cell.el.text("");
@@ -478,6 +547,7 @@
       placeRandomObstacles(10);
       loadBestScore(); // 먼저 불러오고
       updateStatus(); // 그리고 화면 반영
+      resizeCanvas(); // 여기서 한 번 더!
     </script>
   </body>
 </html>
