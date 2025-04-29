@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bomb Block Game (Canvas)</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      canvas {
+        background-color: #1f2937; /* Tailwind bg-gray-800 */
+        display: block;
+        margin: 20px auto;
+      }
+    </style>
+  </head>
+  <body
+    class="flex flex-col items-center justify-start p-4 min-h-screen bg-gray-900"
+  >
+    <h1 class="text-2xl text-yellow-400 font-bold mb-4">
+      Bomb Block Game (Canvas)
+    </h1>
+    <div id="status" class="text-white text-center mb-4 space-y-1">
+      <div>Turn: <span id="status-turn"></span></div>
+      <div>Score: <span id="status-score"></span></div>
+      <div>Best Score: <span id="status-best"></span></div>
+      <div>
+        Range: <span id="status-range"></span> / Damage:
+        <span id="status-damage"></span>
+      </div>
+    </div>
+    <canvas id="game-canvas"></canvas>
+
+    <script>
+      const canvas = document.getElementById("game-canvas");
+      const ctx = canvas.getContext("2d");
+
+      const gridSize = 8;
+      let cellSize = 60;
+      const grid = [];
+      const bombQueue = [];
+      let turn = 0;
+      let score = 0;
+      let bestScore = 0;
+      let gameOver = false;
+      let bombPower = 1;
+      let bombDamage = 1;
+
+      function resizeCanvas() {
+        const minDim = Math.min(window.innerWidth, window.innerHeight) * 0.9;
+        cellSize = Math.floor(minDim / gridSize);
+        canvas.width = cellSize * gridSize;
+        canvas.height = cellSize * gridSize;
+      }
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
+
+      function loadBestScore() {
+        const saved = localStorage.getItem("bombBlockBestScore");
+        bestScore = saved ? parseInt(saved) : 0;
+      }
+
+      function saveBestScore() {
+        if (score > bestScore) {
+          bestScore = score;
+          localStorage.setItem("bombBlockBestScore", bestScore);
+        }
+      }
+
+      function updateStatus() {
+        document.getElementById("status-turn").innerText = turn;
+        document.getElementById("status-score").innerText = score;
+        document.getElementById("status-best").innerText = bestScore;
+        document.getElementById("status-range").innerText = bombPower;
+        document.getElementById("status-damage").innerText = bombDamage;
+      }
+
+      function createGrid() {
+        for (let y = 0; y < gridSize; y++) {
+          grid[y] = [];
+          for (let x = 0; x < gridSize; x++) {
+            grid[y][x] = {
+              bomb: null,
+              obstacle: null,
+              explodeTimer: 0,
+              flashPhase: 0,
+            };
+          }
+        }
+      }
+
+      function placeRandomObstacles(count = 1) {
+        let attempts = 0;
+        while (count > 0 && attempts < 100) {
+          const x = Math.floor(Math.random() * gridSize);
+          const y = Math.floor(Math.random() * gridSize);
+          const cell = grid[y][x];
+          if (!cell.bomb && !cell.obstacle) {
+            cell.obstacle = 1;
+            count--;
+          } else if (cell.obstacle) {
+            cell.obstacle++;
+            count--;
+          }
+          attempts++;
+        }
+      }
+
+      function placeBomb(x, y) {
+        const cell = grid[y][x];
+        if (!cell.bomb && !cell.obstacle) {
+          const bomb = {
+            x,
+            y,
+            countdown: 3,
+            power: bombPower,
+            damage: bombDamage,
+          };
+          cell.bomb = bomb;
+          bombQueue.push(bomb);
+        }
+      }
+
+      function handleCellClick(x, y) {
+        if (gameOver) return;
+        const cell = grid[y][x];
+        if (cell.bomb || cell.obstacle) return;
+
+        placeBomb(x, y);
+        saveBestScore();
+        updateStatus();
+        updateTurn();
+      }
+      function updateTurn() {
+        turn++;
+
+        // 1. 폭탄 카운트다운 감소
+        bombQueue.forEach((bomb) => {
+          bomb.countdown--;
+        });
+
+        // 2. 터질 폭탄 모으기
+        const toExplode = bombQueue.filter((b) => b.countdown <= 0);
+
+        // 3. 연쇄 폭발 관리 (진짜 수정된 부분)
+        const explodedSet = new Set();
+        const queue = [...toExplode];
+
+        while (queue.length > 0) {
+          const bomb = queue.shift();
+          const key = `${bomb.x},${bomb.y}`;
+
+          if (explodedSet.has(key)) continue; // 이미 터진 폭탄은 무시
+          explodedSet.add(key);
+
+          // 폭발 처리 → 연쇄 발생 가능
+          const additionalBombs = explodeBomb(bomb);
+          additionalBombs.forEach((b) => {
+            const bKey = `${b.x},${b.y}`;
+            if (!explodedSet.has(bKey)) {
+              queue.push(b); // 추가된 폭탄들도 queue에 넣어서 즉시 처리
+            }
+          });
+        }
+
+        // 4. 폭탄 큐 정리 (살아남은 것만)
+        bombQueue.splice(
+          0,
+          bombQueue.length,
+          ...bombQueue.filter((b) => b.countdown > 0)
+        );
+
+        // 5. 턴마다 장애물 추가
+        if (turn % 3 === 0) {
+          placeRandomObstacles(Math.floor(turn / 3));
+        }
+
+        updateStatus();
+        checkGameOver();
+      }
+
+      function explodeBomb(bomb) {
+        const { x, y, power, damage } = bomb;
+        const cell = grid[y][x];
+
+        cell.bomb = null;
+        startExplosionEffect(cell);
+
+        const additionalBombs = []; // 연쇄로 추가된 폭탄들
+
+        const dirs = [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ];
+
+        dirs.forEach(([dx, dy]) => {
+          for (let i = 1; i <= power; i++) {
+            const nx = x + dx * i;
+            const ny = y + dy * i;
+            if (nx < 0 || ny < 0 || nx >= gridSize || ny >= gridSize) break;
+
+            const neighbor = grid[ny][nx];
+            startExplosionEffect(neighbor);
+
+            if (neighbor.obstacle) {
+              neighbor.obstacle -= damage;
+              if (neighbor.obstacle <= 0) {
+                score += 2;
+                neighbor.obstacle = null;
+              } else {
+                score += 1;
+              }
+              break; // 장애물 있으면 연쇄 못 퍼짐
+            }
+
+            if (neighbor.bomb && neighbor.bomb.countdown > 0) {
+              neighbor.bomb.countdown = 0;
+              additionalBombs.push(neighbor); // 이 폭탄도 연쇄로 추가
+            }
+          }
+        });
+
+        return additionalBombs;
+      }
+
+      // 폭발 이펙트 세팅
+      function startExplosionEffect(cell) {
+        if (!cell) return;
+        cell.explodeTimer = 15;
+        cell.flashPhase = 0;
+      }
+
+      // 폭발 이펙트 렌더링
+      function applyExplosionEffect(cell, cx, cy, cellSize) {
+        if (cell.explodeTimer > 0) {
+          const phase = cell.flashPhase;
+          const color = phase % 2 === 0 ? "yellow" : "orange";
+          ctx.fillStyle = color;
+          ctx.fillRect(cx, cy, cellSize, cellSize);
+
+          cell.explodeTimer--;
+          if (cell.explodeTimer % 5 === 0) {
+            cell.flashPhase++;
+          }
+        }
+      }
+
+      function checkGameOver() {
+        const hasEmpty = grid.flat().some((c) => !c.bomb && !c.obstacle);
+        if (!hasEmpty) {
+          gameOver = true;
+          alert("Game Over! Refresh to restart.");
+        }
+      }
+
+      function drawGrid() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.font = `${cellSize * 0.5}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        for (let y = 0; y < gridSize; y++) {
+          for (let x = 0; x < gridSize; x++) {
+            const cell = grid[y][x];
+            const cx = x * cellSize;
+            const cy = y * cellSize;
+
+            ctx.strokeStyle = "black";
+            ctx.strokeRect(cx, cy, cellSize, cellSize);
+
+            applyExplosionEffect(cell, cx, cy, cellSize); // 폭발 이펙트 적용
+
+            if (cell.obstacle) {
+              const gray = Math.min(100 + cell.obstacle * 30, 255);
+              ctx.fillStyle = `rgb(${gray}, ${gray}, ${gray})`;
+              ctx.fillRect(cx, cy, cellSize, cellSize);
+              ctx.fillStyle = "white";
+              ctx.fillText(cell.obstacle, cx + cellSize / 2, cy + cellSize / 2);
+            }
+
+            if (cell.bomb && cell.bomb.countdown > 0) {
+              ctx.fillStyle = "red";
+              ctx.fillRect(cx, cy, cellSize, cellSize);
+              ctx.fillStyle = "white";
+              ctx.fillText(
+                cell.bomb.countdown,
+                cx + cellSize / 2,
+                cy + cellSize / 2
+              );
+            }
+          }
+        }
+
+        requestAnimationFrame(drawGrid);
+      }
+
+      // 마우스 클릭 처리
+      canvas.addEventListener("click", function (event) {
+        const rect = canvas.getBoundingClientRect();
+        const x = Math.floor((event.clientX - rect.left) / cellSize);
+        const y = Math.floor((event.clientY - rect.top) / cellSize);
+
+        if (x >= 0 && x < gridSize && y >= 0 && y < gridSize) {
+          handleCellClick(x, y);
+        }
+      });
+
+      // 초기화
+      createGrid();
+      placeRandomObstacles(10);
+      loadBestScore();
+      updateStatus();
+      drawGrid();
+    </script>
+  </body>
+</html>
